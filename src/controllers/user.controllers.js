@@ -3,7 +3,8 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { User } from "../models/user.models.js"
 import { Subscription } from "../models/subscription.models.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import {ApiResponse} from "../utils/ApiResponse.js"
+import { ApiResponse } from "../utils/ApiResponse.js"
+import jwt from "jsonwebtoken"
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -475,6 +476,16 @@ const getWatchHistory = asyncHandler(async(req, res) => {
 })
 
 
-export {registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory } 
+export {registerUser,
+     loginUser,
+     logoutUser,
+     refreshAccessToken, 
+     changeCurrentPassword, 
+     getCurrentUser, 
+     updateAccountDetails, 
+     updateUserAvatar, 
+     updateUserCoverImage, 
+     getUserChannelProfile, 
+     getWatchHistory } 
 
 
