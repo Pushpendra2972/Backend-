@@ -7,10 +7,94 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 
 
+   //TODO: get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-    //TODO: get all videos based on query, sort, pagination
-})
+
+    const { page = 1, limit = 10, query, 
+        sortBy = "createdAt", sortType = "desc", userId
+    } = req.query;
+
+    const matchStage = {
+        isPublished: true
+    };
+
+    // Search by title
+    if (query?.trim()) {
+        matchStage.title = {
+            $regex: query,
+            $options: "i"
+        };
+    }
+
+    // Filter by owner
+    if (userId) {
+
+        if (!isValidObjectId(userId)) {
+            throw new ApiError(
+                400,
+                "Invalid user id"
+            );
+        }
+
+        matchStage.owner = new mongoose.Types.ObjectId(userId);
+    }
+
+    const aggregate = Video.aggregate([
+        {
+            $match: matchStage
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                    {
+                        $project: {
+                            username: 1,
+                            fullName: 1,
+                            avatar: 1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields: {
+                owner: {
+                    $first: "$owner"
+                }
+            }
+        },
+        {
+            $sort: {
+                [sortBy]:
+                    sortType === "asc"
+                        ? 1
+                        : -1
+            }
+        }
+    ]);
+
+    const options = {
+        page: Number(page),
+        limit: Number(limit)
+    };
+
+    const videos = await Video.aggregatePaginate(
+            aggregate,
+            options
+        );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            videos,
+            "Videos fetched successfully"
+        )
+    );
+});
 
     // TODO: get video, upload to cloudinary, create video
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -70,7 +154,21 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid video id");
     }
 
-    const video = await Video.findById(videoId);
+    await Video.findByIdAndUpdate(
+         videoId,
+         {
+             $inc: {
+                   views: 1
+             }
+         }
+     );
+
+    const video = await Video.findById(videoId)
+    .populate(
+        "owner",
+        "username fullName avatar"
+    );
+    
 
     if (!video) {
         throw new ApiError(404, "Video not found");
