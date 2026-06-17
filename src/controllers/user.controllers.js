@@ -5,6 +5,7 @@ import { Subscription } from "../models/subscription.models.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose"
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -121,7 +122,7 @@ const loginUser = asyncHandler(async(req, res) => {
     const isPasswordValid = await user.isPasswordCorrect(password)
 
    if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid user credentials")
+    throw new ApiError(401, "Incorrect Password")
     }
    
     const {accessToken, refreshToken} = await generateAccessAndRefereshTokens(user._id)

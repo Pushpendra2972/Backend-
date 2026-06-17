@@ -5,6 +5,8 @@ import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { Like } from "../models/like.models.js"
+import { Comment } from "../models/comment.models.js"
 
 
    //TODO: get all videos based on query, sort, pagination
@@ -154,30 +156,119 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid video id");
     }
 
-    await Video.findByIdAndUpdate(
+    const updatedVideo = await Video.findByIdAndUpdate(
          videoId,
-         {
-             $inc: {
-                   views: 1
-             }
-         }
-     );
-
-    const video = await Video.findById(videoId)
-    .populate(
-        "owner",
-        "username fullName avatar"
+        {
+            $inc: {
+                views: 1
+            }
+        },
+        {
+             new: true
+        }  
     );
+
+    if (!updatedVideo) {
+        throw new ApiError(404, "Video not found");
+    }
+
+    // await User.findByIdAndUpdate(
+    //     req.user._id,
+    //     {
+    //         $push: {
+    //             watchHistory: videoId
+    //         }
+    //     },
+    //     {
+    //         new : true
+    //     }
+    // )
+
+    const user = await User.findById(req.user._id);
+
+    const lastVideo = user.watchHistory[user.watchHistory.length - 1];
+
+    if (!lastVideo || lastVideo.toString() !== videoId) {
+       
+        user.watchHistory.push(videoId);
+        await user.save({ validateBeforeSave: false });
+     }
+
+
+    const video = await Video.aggregate([
+        {
+            $match: {
+                 _id: new mongoose.Types.ObjectId(videoId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users" ,
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [{
+
+                    $project: {
+                         fullName: 1,
+                         username: 1,
+                         avatar: 1
+                        }
+                }]
+            }
+            
+        },
+        {
+            $addFields: {
+                    owner: {
+                        $first: "$owner"
+                    }
+             }
+        },
+        {
+           $lookup: {
+               from: "likes",
+               localField: "_id",
+               foreignField: "video",
+               as:"likes" 
+           }
+        },
+        {
+            $lookup: {
+               from: "comments",
+               localField: "_id",
+               foreignField: "video",
+               as:"comments" 
+           }  
+        },
+        {
+            $addFields: {
+                likesCount: {
+                    $size: "$likes"
+                },
+                commentCount: {
+                    $size: "$comments"
+                }
+            }
+        },
+        {
+            $project: {
+               likes: 0,
+               comments: 0
+            }
+        }
+     
+     ]) 
     
 
-    if (!video) {
-        throw new ApiError(404, "Video not found");
+    if (video.length === 0) {
+         throw new ApiError(404, "Video not found");
     }
 
     return res.status(200).json(
         new ApiResponse(
             200,
-            video,
+            video[0],
             "Video fetched successfully"
         )
     );
@@ -231,7 +322,12 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
     const { videoId } = req.params;
 
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(400, "Invalid video id");
+    }
+
     const video = await Video.findById(videoId);
+
 
     if (!video) {
         throw new ApiError(404, "Video not found");
