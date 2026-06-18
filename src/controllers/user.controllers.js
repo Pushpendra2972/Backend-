@@ -105,6 +105,7 @@ const loginUser = asyncHandler(async(req, res) => {
     //access and referesh token
     //send cookie
 
+
     const {username, email, password} = req.body
 
     if (!username && !email) {
@@ -130,13 +131,14 @@ const loginUser = asyncHandler(async(req, res) => {
    
     const {accessToken, refreshToken} = await generateAccessAndRefereshTokens(user._id)
 
-        const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
 
     const options = {
-        httpOnly: true,
-        secure: true
-    }
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax"
+    };
 
     return res
     .status(200)
@@ -168,9 +170,10 @@ const logoutUser = asyncHandler(async(req, res) => {
     )
 
     const options = {
-        httpOnly: true,
-        secure: true
-    }
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax"
+    };
 
     return res
     .status(200)
@@ -203,12 +206,13 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             
         }
     
-        const options = {
-            httpOnly: true,
-            secure: true
-        }
-    
-        const {accessToken,  refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
+     const options = {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax"
+     };
+        
+    const {accessToken,  refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
     
         return res
         .status(200)
