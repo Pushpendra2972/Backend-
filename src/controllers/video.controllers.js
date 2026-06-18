@@ -7,6 +7,7 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { Like } from "../models/like.models.js"
 import { Comment } from "../models/comment.models.js"
+import { Playlist } from "../models/playlist.models.js"
 
 
    //TODO: get all videos based on query, sort, pagination
@@ -129,6 +130,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Video upload failed");
     }
 
+    if (!thumbnail) {
+        throw new ApiError(500, "Thumbnail upload failed");
+    }
+
     const video = await Video.create({
         title,
         description,
@@ -189,6 +194,10 @@ const getVideoById = asyncHandler(async (req, res) => {
     // )
 
     const user = await User.findById(req.user._id);
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
 
     const lastVideo = user.watchHistory[user.watchHistory.length - 1];
 
@@ -305,8 +314,12 @@ const updateVideo = asyncHandler(async (req, res) => {
     const thumbnailLocalPath = req.file?.path;
 
     if (thumbnailLocalPath) {
-
         const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+        if (!thumbnail) {
+            throw new ApiError(500, "Thumbnail upload failed");
+        }
+
         video.thumbnail = thumbnail.url;
     }
 

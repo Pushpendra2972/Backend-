@@ -38,22 +38,27 @@ const registerUser = asyncHandler( async (req, res) => {
     const { fullName, email, username, password} = req.body
 
     if(
-        [fullName, email, username, password].some((field) => field.trim() === "")
+        !fullName || !email || !username || !password ||
+        [fullName, email, username, password].some((field) => field?.trim() === "")
     ){
         throw new ApiError(400, "All fields are required")
-        
     }
+
+    const normalizedUsername = username.trim().toLowerCase()
+    const normalizedEmail = email.trim().toLowerCase()
 
     const exsistedUser = await User.findOne({
-        $or: [{username: username?.trim().toLowerCase()},
-             {email: email?.trim().toLowerCase()}]
+        $or: [
+            { username: normalizedUsername },
+            { email: normalizedEmail }
+        ]
     })
 
-    if(exsistedUser){
-       throw new ApiError(409, "User with email or username already exists")
+    if (exsistedUser) {
+        throw new ApiError(409, "User with email or username already exists")
     }
 
-     const avatarLocalPath = req.files?.avatar[0]?.path;
+    const avatarLocalPath = req.files?.avatar[0]?.path;
     //  const  coverImagePath = req.files?.coverImage[0]?.path;
 
      let coverImageLocalPath;
@@ -79,9 +84,9 @@ const registerUser = asyncHandler( async (req, res) => {
         fullName,
         avatar: avatar.url,
         coverImage: coverImage?.url || "",
-        email, 
+        email: normalizedEmail,
         password,
-        username: username.toLowerCase()
+        username: normalizedUsername
     })
 
     const createdUser = await User.findById(user._id).select(
@@ -92,8 +97,8 @@ const registerUser = asyncHandler( async (req, res) => {
         throw new ApiError(500, "Something went wrong while registering the user")
     }
 
-    return res.status(200).json(
-        new ApiResponse(200, createdUser, "User registered Successfully")
+    return res.status(201).json(
+        new ApiResponse(201, createdUser, "User registered Successfully")
     )
 })
 
@@ -135,10 +140,10 @@ const loginUser = asyncHandler(async(req, res) => {
 
 
     const options = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax"
-    };
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax"
+   };
 
     return res
     .status(200)
@@ -170,10 +175,10 @@ const logoutUser = asyncHandler(async(req, res) => {
     )
 
     const options = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax"
-    };
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax"
+   };
 
     return res
     .status(200)
@@ -206,11 +211,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             
         }
     
-     const options = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax"
-     };
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax"
+    };
         
     const {accessToken,  refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
     
