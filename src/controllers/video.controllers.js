@@ -156,21 +156,25 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid video id");
     }
 
-    const updatedVideo = await Video.findByIdAndUpdate(
-         videoId,
+
+    const video = await Video.findOneAndUpdate(
         {
-            $inc: {
-                views: 1
+             _id: videoId,
+             isPublished: true
+        },
+        {
+            $inc: { 
+                views: 1 
             }
         },
         {
              new: true
-        }  
+        }
     );
 
-    if (!updatedVideo) {
-        throw new ApiError(404, "Video not found");
-    }
+     if (!video) {
+         throw new ApiError(404, "Video not found or not published");
+     }
 
     // await User.findByIdAndUpdate(
     //     req.user._id,
@@ -195,7 +199,7 @@ const getVideoById = asyncHandler(async (req, res) => {
      }
 
 
-    const video = await Video.aggregate([
+    const videoInfo = await Video.aggregate([
         {
             $match: {
                  _id: new mongoose.Types.ObjectId(videoId)
@@ -261,14 +265,14 @@ const getVideoById = asyncHandler(async (req, res) => {
      ]) 
     
 
-    if (video.length === 0) {
+    if (videoInfo.length === 0) {
          throw new ApiError(404, "Video not found");
     }
 
     return res.status(200).json(
         new ApiResponse(
             200,
-            video[0],
+            videoInfo[0],
             "Video fetched successfully"
         )
     );
@@ -338,6 +342,27 @@ const deleteVideo = asyncHandler(async (req, res) => {
     }
 
     await Video.findByIdAndDelete(videoId);
+
+    await Comment.deleteMany({video: videoId});
+    await Like.deleteMany({video: videoId});
+    await Playlist.updateMany(
+        {},
+        {
+            $pull: {
+               videos: videoId
+            }
+        }
+    );
+
+    await User.updateMany(
+       {},
+       {
+           $pull: {
+              watchHistory: videoId
+            }
+        }
+    );
+
 
     return res.status(200).json(
         new ApiResponse(

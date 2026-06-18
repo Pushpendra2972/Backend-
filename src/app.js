@@ -1,6 +1,7 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
+import { errorHandler } from "./middlewares/error.middlewares.js";
 
 const app = express()
 
@@ -9,7 +10,7 @@ app.use(cors({   // to handle cross origin
     credentials: true
 }))
 
-app.use(express.json({limit: "16kb"}))
+app.use(express.json({limit: "100kb"}))
 app.use(express.urlencoded({extended: true}))
 app.use(express.static("public"))
 app.use(cookieParser())
@@ -35,6 +36,6 @@ app.use("/api/v1/likes", likeRouter )
 app.use("/api/v1/tweets", tweetRouter )
 app.use("/api/v1/playlists", playlistRouter )
 
-
+app.use(errorHandler);
 
 export default app

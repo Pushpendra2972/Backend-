@@ -14,7 +14,7 @@ const generateAccessAndRefereshTokens = async(userId) =>{
         const refreshToken = user.generateRefreshToken()
 
         user.refreshToken = refreshToken
-        user.save({ validateBeforeSave: false })
+        await user.save({ validateBeforeSave: false })
 
         return {accessToken, refreshToken}
 
@@ -45,7 +45,8 @@ const registerUser = asyncHandler( async (req, res) => {
     }
 
     const exsistedUser = await User.findOne({
-        $or: [{username}, {email}]
+        $or: [{username: username?.trim().toLowerCase()},
+             {email: email?.trim().toLowerCase()}]
     })
 
     if(exsistedUser){
@@ -91,7 +92,7 @@ const registerUser = asyncHandler( async (req, res) => {
         throw new ApiError(500, "Something went wrong while registering the user")
     }
 
-    return res.status(201).json(
+    return res.status(200).json(
         new ApiResponse(200, createdUser, "User registered Successfully")
     )
 })
@@ -109,9 +110,11 @@ const loginUser = asyncHandler(async(req, res) => {
     if (!username && !email) {
         throw new ApiError(400, "username or email is required")
     }
-    
+
+
     const user = await User.findOne({
-        $or: [{username}, {email}]
+        $or: [{username: username?.trim().toLowerCase()},
+             {email: email?.trim().toLowerCase()}]
     })
 
     if (!user) {
@@ -205,7 +208,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             secure: true
         }
     
-        const {accessToken, newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
+        const {accessToken,  refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
     
         return res
         .status(200)
@@ -226,9 +229,12 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async(req, res) => {
     const {oldPassword, newPassword} = req.body
-
     
- const user = await User.findById(req.user?._id)
+    if (!newPassword) {
+        throw new ApiError(400, "newPassword is required")
+    }
+    
+    const user = await User.findById(req.user?._id)
     const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
     if (!isPasswordCorrect) {

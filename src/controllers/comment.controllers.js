@@ -1,4 +1,4 @@
-import mongoose from "mongoose"
+import mongoose, {isValidObjectId} from "mongoose"
 import { Comment } from "../models/comment.models.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
@@ -79,6 +79,13 @@ const addComment = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
     const { content } = req.body;
 
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(
+            400,
+            "Invalid video id"
+        );
+    }
+
     if (!content?.trim()) {
         throw new ApiError(400, "Comment content is required");
     }
@@ -105,6 +112,13 @@ const updateComment = asyncHandler(async (req, res) => {
     const { commentId } = req.params;
     const { content } = req.body;
 
+    if (!isValidObjectId(commentId)) {
+        throw new ApiError(
+            400,
+            "Invalid comment id"
+        );
+    }
+
     const comment = await Comment.findById(commentId);
 
     if (!comment) {
@@ -113,6 +127,10 @@ const updateComment = asyncHandler(async (req, res) => {
 
     if ( comment.owner.toString() !== req.user._id.toString() ) {
         throw new ApiError(403, "Unauthorized");
+    }
+
+     if (!content?.trim()) {
+        throw new ApiError(400, "Comment content is required");
     }
 
     comment.content = content;
@@ -133,6 +151,13 @@ const updateComment = asyncHandler(async (req, res) => {
 const deleteComment = asyncHandler(async (req, res) => {
 
     const { commentId } = req.params;
+
+    if (!isValidObjectId(commentId)) {
+        throw new ApiError(
+            400,
+            "Invalid comment id"
+        );
+    }
 
     const comment = await Comment.findById(commentId);
 
