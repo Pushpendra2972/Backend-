@@ -19,41 +19,70 @@ const getVideoComments = asyncHandler(async (req, res) => {
     }
 
     const aggregate = Comment.aggregate([
-        {
-            $match: {
-                video: new mongoose.Types.ObjectId(videoId)
-            }
-        },
-        {
-            $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "owner",
-                pipeline: [
-                    {
-                        $project: {
-                            username: 1,
-                            fullName: 1,
-                            avatar: 1
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            $addFields: {
-                owner: {
-                    $first: "$owner"
-                }
-            }
-        },
-        {
-            $sort: {
-                createdAt: -1
-            }
-        }
-    ]);
+         {
+             $match: {
+                 video: new mongoose.Types.ObjectId(videoId)
+             }
+         },
+         {
+             $lookup: {
+                 from: "users",
+                 localField: "owner",
+                 foreignField: "_id",
+                 as: "owner",
+                 pipeline: [
+                     {
+                         $project: {
+                             username: 1,
+                             fullName: 1,
+                             avatar: 1
+                         }
+                     }
+                 ]
+             }
+         },
+         {
+             $addFields: {
+                 owner: {
+                     $first: "$owner"
+                 }
+             }
+         },
+    
+         // Like lookup
+         {
+             $lookup: {
+                 from: "likes",
+                 localField: "_id",
+                 foreignField: "comment",
+                 as: "likes"
+             }
+         },
+    
+         {
+             $addFields: {
+                 likesCount: {
+                     $size: "$likes"
+                 },
+    
+                 isLiked: {
+                     $in: [req.user._id, "$likes.likedBy"]
+                 }
+             }
+         },
+    
+         {
+             $project: {
+                 likes: 0
+             }
+         },
+    
+         {
+             $sort: {
+                 createdAt: -1
+             }
+         }
+     ]);
 
     const comments = await Comment.aggregatePaginate(
             aggregate,
@@ -96,10 +125,15 @@ const addComment = asyncHandler(async (req, res) => {
         owner: req.user._id
     });
 
+    const populateComment = await comment.populate({
+        path: "owner",
+        select: "username fullName avatar"
+    });
+
     return res.status(201).json(
         new ApiResponse(
             201,
-            comment,
+            populateComment,
             "Comment added successfully"
         )
     );
@@ -137,10 +171,14 @@ const updateComment = asyncHandler(async (req, res) => {
 
     await comment.save();
 
+    const updatedComment = await Comment.findById(comment._id)
+       .populate("owner", "username fullName avatar");
+       
+
     return res.status(200).json(
         new ApiResponse(
             200,
-            comment,
+            updatedComment,
             "Comment updated successfully"
         )
     );

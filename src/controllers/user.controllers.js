@@ -6,6 +6,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose"
+import fs from "fs"
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -54,9 +55,6 @@ const registerUser = asyncHandler( async (req, res) => {
         ]
     })
 
-    if (exsistedUser) {
-        throw new ApiError(409, "User with email or username already exists")
-    }
 
     const avatarLocalPath = req.files?.avatar[0]?.path;
     //  const  coverImagePath = req.files?.coverImage[0]?.path;
@@ -65,6 +63,20 @@ const registerUser = asyncHandler( async (req, res) => {
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path
     }
+
+    if (exsistedUser) {
+         if (avatarLocalPath && fs.existsSync(avatarLocalPath)) {
+                     fs.unlinkSync(avatarLocalPath)
+        }
+        if (coverImageLocalPath && fs.existsSync(coverImageLocalPath)) {
+                    fs.unlinkSync(coverImageLocalPath)
+                }
+        
+        
+        throw new ApiError(409, "User with email or username already exists")
+    }
+
+    
     
 
      if(!avatarLocalPath){
@@ -412,6 +424,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
         },
         {
             $project: {
+                _id: 1,
                 fullName: 1,
                 username: 1,
                 subscribersCount: 1,
@@ -436,59 +449,87 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
     )
 })
 
-const getWatchHistory = asyncHandler(async(req, res) => {
-    const user = await User.aggregate([
+const getWatchHistory = asyncHandler(async (req, res) => {
+
+    const history = await User.aggregate([
+
         {
             $match: {
                 _id: new mongoose.Types.ObjectId(req.user._id)
             }
         },
+
+        {
+            $unwind: {
+                path: "$watchHistory",
+                includeArrayIndex: "historyIndex"
+            }
+        },
+
         {
             $lookup: {
                 from: "videos",
                 localField: "watchHistory",
                 foreignField: "_id",
-                as: "watchHistory",
+                as: "video"
+            }
+        },
+
+        {
+            $unwind: "$video"
+        },
+
+        {
+            $lookup: {
+                from: "users",
+                localField: "video.owner",
+                foreignField: "_id",
+                as: "video.owner",
                 pipeline: [
                     {
-                        $lookup: {
-                            from: "users",
-                            localField: "owner",
-                            foreignField: "_id",
-                            as: "owner",
-                            pipeline: [
-                                {
-                                    $project: {
-                                        fullName: 1,
-                                        username: 1,
-                                        avatar: 1
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    {
-                        $addFields:{
-                            owner:{
-                                $first: "$owner"
-                            }
+                        $project: {
+                            fullName: 1,
+                            username: 1,
+                            avatar: 1
                         }
                     }
                 ]
             }
-        }
-    ])
+        },
 
-    return res
-    .status(200)
-    .json(
+        {
+            $addFields: {
+                "video.owner": {
+                    $first: "$video.owner"
+                }
+            }
+        },
+
+        {
+            $sort: {
+                historyIndex: -1
+            }
+        },
+
+        {
+            $group: {
+                _id: "$_id",
+                watchHistory: {
+                    $push: "$video"
+                }
+            }
+        }
+
+    ]);
+
+    return res.status(200).json(
         new ApiResponse(
             200,
-            user[0].watchHistory,
+            history[0]?.watchHistory || [],
             "Watch history fetched successfully"
         )
-    )
-})
+    );
+});
 
 
 export {registerUser,

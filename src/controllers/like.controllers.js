@@ -17,6 +17,7 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid video id");
     }
 
+
     const video = await Video.findById(videoId);
 
     if (!video) {
@@ -153,35 +154,60 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 const getLikedVideos = asyncHandler(async (req, res) => {
 
     const likedVideos = await Like.aggregate([
+       
         {
-            $match: {
-                likedBy: new mongoose.Types.ObjectId( req.user._id),
-                video: {
-                    $exists: true
-                }
-            }
-        },
-        {
-            $lookup: {
-                from: "videos",
-                localField: "video",
-                foreignField: "_id",
-                as: "video"
-            }
-        },
-        {
-            $addFields: {
-                video: {
-                    $first: "$video"
-                }
-            }
-        },
-        {
-            $project: {
-                video: 1
-            }
-        }
-    ]);
+              $match: {
+                  likedBy: new mongoose.Types.ObjectId(req.user._id),
+                  video: { $exists: true }
+              }
+          },
+          {
+              $lookup: {
+                  from: "videos",
+                  localField: "video",
+                  foreignField: "_id",
+                  as: "video",
+                  pipeline: [
+                      {
+                          $lookup: {
+                              from: "users",
+                              localField: "owner",
+                              foreignField: "_id",
+                              as: "owner",
+                              pipeline: [
+                                  {
+                                      $project: {
+                                          username: 1,
+                                          fullName: 1,
+                                          avatar: 1
+                                      }
+                                  }
+                              ]
+                          }
+                      },
+                      {
+                          $addFields: {
+                              owner: {
+                                  $first: "$owner"
+                              }
+                          }
+                      }
+                  ]
+              }
+          },
+          {
+              $addFields: {
+                  video: {
+                      $first: "$video"
+                  }
+              }
+          },
+          {
+              $replaceRoot: {
+                  newRoot: "$video"
+              }
+          }
+     ]);      
 
     return res.status(200).json(
         new ApiResponse(

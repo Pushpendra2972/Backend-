@@ -8,6 +8,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { Like } from "../models/like.models.js"
 import { Comment } from "../models/comment.models.js"
 import { Playlist } from "../models/playlist.models.js"
+import { Subscription } from "../models/subscription.models.js"
 
 
    //TODO: get all videos based on query, sort, pagination
@@ -16,6 +17,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, 
         sortBy = "createdAt", sortType = "desc", userId
     } = req.query;
+
 
     const matchStage = {
         isPublished: true
@@ -99,13 +101,38 @@ const getAllVideos = asyncHandler(async (req, res) => {
     );
 });
 
+   //TODO: get all videos of user
+const getMyVideos = asyncHandler(async (req, res) => {
+
+
+    const videos = await Video.find({
+        owner: req.user._id
+    })
+    .sort({
+        createdAt: -1
+    })
+    .select(
+        "title description thumbnail views isPublished createdAt"
+    );
+
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            videos,
+            "Videos fetched successfully"
+        )
+    );
+
+});
+
     // TODO: get video, upload to cloudinary, create video
 const publishAVideo = asyncHandler(async (req, res) => {
 
     const { title, description } = req.body;
 
     if (!title || !description) {
-        throw new ApiError(400, "Title and description are required");
+        throw new ApiError(400, "Both title and description are required");
     }
 
     const videoLocalPath =
@@ -199,6 +226,7 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
+
     const lastVideo = user.watchHistory[user.watchHistory.length - 1];
 
     if (!lastVideo || lastVideo.toString() !== videoId) {
@@ -255,19 +283,48 @@ const getVideoById = asyncHandler(async (req, res) => {
            }  
         },
         {
+            $lookup: {
+                from: "subscriptions",
+                localField: "owner._id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
             $addFields: {
                 likesCount: {
                     $size: "$likes"
                 },
                 commentCount: {
                     $size: "$comments"
+                },
+                // islikedByUser: {
+                //     $cond: {
+                //         if: {
+                //             $in: [req.user._id, "$likes.owner"]
+                //         },
+                //         then: true,
+                //         else: false
+                //     }
+                // }
+
+                isLiked: {
+                       $in: [req.user._id, "$likes.owner"]
+                },
+                subscriberCount: {
+                    $size: "$subscribers"
+                },
+                isSubscribed: {
+                    $in: [req.user._id, "$subscribers.subscriber"]
                 }
             }
         },
+
         {
             $project: {
                likes: 0,
-               comments: 0
+               comments: 0,
+               subscribers: 0
             }
         }
      
@@ -303,17 +360,28 @@ const updateVideo = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized");
     }
 
-    if (title) {
-        video.title = title;
-    }
+    if (title !== undefined) {
 
-    if (description) {
-        video.description = description;
-    }
+        if (!title.trim()) {
+             throw new ApiError(400, "Title is required");
+        }
 
+        video.title = title.trim();
+   }
+
+   if (description !== undefined) {
+
+       if (!description.trim()) {
+           throw new ApiError(400, "Description is required");
+        }
+
+        video.description = description.trim();
+    }
+    
     const thumbnailLocalPath = req.file?.path;
 
     if (thumbnailLocalPath) {
+       
         const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
 
         if (!thumbnail) {
@@ -322,6 +390,7 @@ const updateVideo = asyncHandler(async (req, res) => {
 
         video.thumbnail = thumbnail.url;
     }
+
 
     await video.save();
 
@@ -415,6 +484,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
 
 export {
     getAllVideos,
+    getMyVideos,
     publishAVideo,
     getVideoById,
     updateVideo,

@@ -19,7 +19,7 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
     const existingPlaylist = await Playlist.findOne({
             owner: req.user._id,
-            name
+            name: name.trim().toLowerCase()
         })
 
     if (existingPlaylist) {
@@ -30,8 +30,8 @@ const createPlaylist = asyncHandler(async (req, res) => {
     }
 
     const playlist = await Playlist.create({
-        name,
-        description,
+        name: name.trim().toLowerCase(),
+        description: description.trim(),
         owner: req.user._id
     })
 
@@ -185,60 +185,71 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     // TODO: add video to playlist
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
-    const { playlistId, videoId } = req.params
+    const { playlistId, videoId } = req.params;
 
-    if (!isValidObjectId(playlistId) || !isValidObjectId(videoId)) {
+    if (
+        !isValidObjectId(playlistId) ||
+        !isValidObjectId(videoId)
+    ) {
         throw new ApiError(
             400,
             "Invalid id"
-        )
+        );
     }
 
-    const playlist = await Playlist.findById( playlistId )
+    const playlist = await Playlist.findById(playlistId);
 
     if (!playlist) {
         throw new ApiError(
             404,
             "Playlist not found"
-        )
+        );
     }
 
-    if (playlist.owner.toString() !== req.user._id.toString()) {
+    if (
+        playlist.owner.toString() !==
+        req.user._id.toString()
+    ) {
         throw new ApiError(
             403,
             "Unauthorized"
-        )
+        );
     }
 
-    const video = await Video.findById(videoId)
+    const video = await Video.findById(videoId);
 
     if (!video) {
         throw new ApiError(
             404,
             "Video not found"
-        )
+        );
     }
 
-    const updatedPlaylist = await Playlist.findByIdAndUpdate(
-            playlistId,
-            {
-                $addToSet: {
-                    videos: videoId
-                }
-            },
-            {
-                new: true
-            }
-        )
+    // Check if video already exists
+    const alreadyExists = playlist.videos.some(
+        (id) => id.toString() === videoId
+    );
+
+    if (alreadyExists) {
+        throw new ApiError(
+            409,
+            "Video already exists in this playlist"
+        );
+    }
+
+    playlist.videos.push(videoId);
+
+    await playlist.save();
 
     return res.status(200).json(
         new ApiResponse(
             200,
-            updatedPlaylist,
+            playlist,
             "Video added successfully"
         )
-    )
-})
+    );
+
+});
 
      // TODO: remove video from playlist
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
