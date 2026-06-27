@@ -151,11 +151,14 @@ const loginUser = asyncHandler(async(req, res) => {
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
 
-    const options = {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none"
-   };
+    const isProduction = process.env.NODE_ENV === "production";
+
+const options = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+};
 
     return res
     .status(200)
@@ -186,11 +189,14 @@ const logoutUser = asyncHandler(async(req, res) => {
         }
     )
 
-    const options = {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none"
-   };
+   const isProduction = process.env.NODE_ENV === "production";
+
+const options = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+};
 
     return res
     .status(200)
@@ -223,11 +229,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             
         }
     
-    const options = {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none"
-    };
+   const isProduction = process.env.NODE_ENV === "production";
+
+const options = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+};
         
     const {accessToken,  refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
     
